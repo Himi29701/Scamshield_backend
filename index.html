@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ScamShield — Investigation Console</title>
+<script>window.SCAMSHIELD_API_BASE = "https://scamshield-backend-zdhl.onrender.com";</script>
+<style>
+  :root {
+    --ink: #10151b;
+    --paper: #f6f5f1;
+    --line: #d8d4c9;
+    --alarm: #b3392c;
+    --caution: #b8842e;
+    --clear: #2f6b4f;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    min-height: 100vh;
+  }
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 28px 32px 20px;
+  }
+  header .mark {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #6b6558;
+  }
+  header h1 {
+    margin: 6px 0 0;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 32px;
+  }
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  textarea {
+    flex: 1;
+    min-height: 110px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    background: #fff;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    resize: vertical;
+    border-radius: 2px;
+  }
+  button {
+    background: var(--ink);
+    color: var(--paper);
+    border: none;
+    padding: 14px 20px;
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    border-radius: 2px;
+  }
+  button:disabled { opacity: 0.5; cursor: wait; }
+  button:hover:not(:disabled) { background: #2a3038; }
+
+  .log {
+    margin-top: 28px;
+    border-left: 2px solid var(--line);
+    padding-left: 20px;
+  }
+  .step {
+    position: relative;
+    padding: 4px 0 20px;
+    opacity: 0;
+    animation: fadeIn 0.35s ease forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .step::before {
+    content: '';
+    position: absolute;
+    left: -25px;
+    top: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--ink);
+  }
+  .step .label {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: #3c3830;
+  }
+  .step.running .label::after {
+    content: ' …';
+    color: #9a9483;
+  }
+  .step pre {
+    margin: 8px 0 0;
+    background: #fff;
+    border: 1px solid var(--line);
+    padding: 10px 12px;
+    font-size: 12px;
+    overflow-x: auto;
+    border-radius: 2px;
+    max-height: 260px;
+  }
+
+  .verdict {
+    margin-top: 24px;
+    border: 1px solid var(--line);
+    background: #fff;
+    padding: 22px;
+    border-radius: 3px;
+  }
+  .verdict .badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 4px 10px;
+    border-radius: 2px;
+    color: #fff;
+    margin-bottom: 12px;
+  }
+  .badge.malicious { background: var(--alarm); }
+  .badge.suspicious { background: var(--caution); }
+  .badge.likely_legitimate { background: var(--clear); }
+  .score {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: #6b6558;
+    margin-bottom: 14px;
+  }
+  .verdict h3 { margin: 18px 0 6px; font-size: 14px; }
+  .verdict p, .verdict li { font-size: 14px; line-height: 1.55; }
+  .verdict textarea.action {
+    width: 100%;
+    min-height: 90px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 10px;
+    border: 1px solid var(--line);
+    border-radius: 2px;
+    background: #fbfaf7;
+  }
+  .indicators { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .indicators span {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    background: #efece3;
+    border: 1px solid var(--line);
+    padding: 3px 8px;
+    border-radius: 2px;
+  }
+  .wake-note {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #9a9483;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="mark">ScamShield / Investigation Console</div>
+  <h1>Paste a suspicious link, email, or message</h1>
+</header>
+<main>
+  <div class="input-row">
+    <textarea id="input" placeholder="Paste a URL, forwarded email, or scam SMS/WhatsApp text..."></textarea>
+    <button id="run">Investigate</button>
+  </div>
+  <div class="wake-note">First request may take 20-30s if the backend has been idle.</div>
+
+  <div id="log" class="log" style="display:none;"></div>
+  <div id="verdict"></div>
+</main>
+
+<script>
+  const API_BASE = window.SCAMSHIELD_API_BASE || "http://localhost:8000";
+
+  const runBtn = document.getElementById("run");
+  const input = document.getElementById("input");
+  const log = document.getElementById("log");
+  const verdictEl = document.getElementById("verdict");
+
+  function renderStep(evt) {
+    let el = document.getElementById("step-" + evt.step);
+    if (!el) {
+      el = document.createElement("div");
+      el.className = "step running";
+      el.id = "step-" + evt.step;
+      el.innerHTML = `<div class="label"></div>`;
+      log.appendChild(el);
+    }
+    el.className = "step " + (evt.status === "done" ? "done" : "running");
+    el.querySelector(".label").textContent = evt.label;
+
+    if (evt.status === "done" && evt.data && evt.step !== "complete") {
+      let pre = el.querySelector("pre");
+      if (!pre) {
+        pre = document.createElement("pre");
+        el.appendChild(pre);
+      }
+      pre.textContent = JSON.stringify(evt.data, null, 2);
+    }
+  }
+
+  function renderVerdict(final) {
+    const v = final.verdict;
+    const badgeClass = v.verdict || "suspicious";
+    verdictEl.innerHTML = `
+      <div class="verdict">
+        <span class="badge ${badgeClass}">${(v.verdict || "unknown").replace("_", " ")}</span>
+        <div class="score">Risk score: ${v.risk_score ?? "—"} / 100</div>
+        <p>${v.justification || ""}</p>
+        <div class="indicators">
+          ${(v.indicators || []).map(i => `<span>${i}</span>`).join("")}
+        </div>
+        ${v.abuse_report_draft ? `
+          <h3>Draft abuse report</h3>
+          <textarea class="action" readonly>${v.abuse_report_draft}</textarea>
+        ` : ""}
+        ${v.warning_reply_draft ? `
+          <h3>Draft warning reply</h3>
+          <textarea class="action" readonly>${v.warning_reply_draft}</textarea>
+        ` : ""}
+        ${v.incident_summary ? `
+          <h3>Shareable summary</h3>
+          <p>${v.incident_summary}</p>
+        ` : ""}
+      </div>
+    `;
+  }
+
+  async function runInvestigation() {
+    const text = input.value.trim();
+    if (!text) return;
+
+    runBtn.disabled = true;
+    log.style.display = "block";
+    log.innerHTML = "";
+    verdictEl.innerHTML = "";
+
+    try {
+      const resp = await fetch(`${API_BASE}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop();
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          const evt = JSON.parse(line);
+          renderStep(evt);
+          if (evt.step === "complete") renderVerdict(evt.data);
+        }
+      }
+    } catch (err) {
+      log.innerHTML += `<div class="step done"><div class="label">Error: ${err.message}</div></div>`;
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  runBtn.addEventListener("click", runInvestigation);
+</script>
+</body>
+</html>
