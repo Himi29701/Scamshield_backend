@@ -54,28 +54,52 @@ def check_ssl(domain: str) -> dict:
         return {"domain": domain, "has_valid_cert": False, "error": str(e)}
 
 
+import time
+import os
+
+ANAKIN_BASE = "https://api.anakin.io/v1"
+ANAKIN_API_KEY = os.environ.get("ANAKIN_API_KEY")
+
 def fetch_page(url: str) -> dict:
     try:
-        resp = requests.get(
-            url,
-            headers={"User-Agent": USER_AGENT},
+        headers = {"Content-Type": "application/json"}
+        if ANAKIN_API_KEY:
+            headers["X-API-Key"] = ANAKIN_API_KEY
+
+        submit = requests.post(
+            f"{ANAKIN_BASE}/url-scraper",
+            headers=headers,
+            json={"url": url, "country": "us", "formats": ["markdown", "html", "cleanedHtml"]},
             timeout=REQUEST_TIMEOUT,
-            allow_redirects=True,
         )
-        redirect_chain = [r.url for r in resp.history] + [resp.url]
-        return {
-            "url": url,
-            "reachable": True,
-            "status_code": resp.status_code,
-            "final_url": resp.url,
-            "redirect_chain": redirect_chain,
-            "redirected": len(resp.history) > 0,
-            "content_snippet": resp.text[:3000],
-            "content_length": len(resp.text),
-        }
+        job_id = submit.json().get("jobId")
+        if not job_id:
+            return {"url": url, "reachable": False, "error": f"Anakin did not return a jobId: {submit.text[:200]}"}
+
+        for _ in range(30):
+            status_resp = requests.get(f"{ANAKIN_BASE}/url-scraper/{job_id}", headers=headers, timeout=REQUEST_TIMEOUT)
+            data = status_resp.json()
+            if data.get("status") == "completed":
+                result = data.get("result", {})
+                content = result.get("markdown") or result.get("html") or ""
+                return {
+                    "url": url,
+                    "reachable": True,
+                    "status_code": 200,
+                    "final_url": result.get("url", url),
+                    "redirect_chain": [url],
+                    "redirected": result.get("url", url) != url,
+                    "content_snippet": content[:3000],
+                    "content_length": len(content),
+                    "scraped_via": "anakin.io",
+                }
+            if data.get("status") == "failed":
+                return {"url": url, "reachable": False, "error": data.get("error", "Anakin job failed")}
+            time.sleep(2)
+
+        return {"url": url, "reachable": False, "error": "Anakin job timed out"}
     except Exception as e:
         return {"url": url, "reachable": False, "error": str(e)}
-
 
 def investigate_domain(domain: str, url: str | None = None) -> dict:
     result = {
