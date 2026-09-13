@@ -3,249 +3,506 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ScamShield — Investigation Console</title>
+<title>ScamShield — Signal Watch</title>
 <script>window.SCAMSHIELD_API_BASE = "https://scamshield-backend-zdhl.onrender.com";</script>
 <style>
   :root {
-    --ink: #10151b;
-    --paper: #f6f5f1;
-    --line: #d8d4c9;
-    --alarm: #b3392c;
-    --caution: #b8842e;
-    --clear: #2f6b4f;
+    --void: #0a0e1a;
+    --panel: #121729;
+    --panel-2: #171d34;
+    --line: #2a3152;
+    --violet: #7c6cf0;
+    --violet-dim: #4a3f9e;
+    --teal: #34d1bf;
+    --alarm: #ef5b5b;
+    --caution: #f0a34e;
+    --clear: #4fd88a;
+    --ink: #e8e6f5;
+    --muted: #8b8aa8;
     --mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
     --sans: 'IBM Plex Sans', -apple-system, sans-serif;
   }
   * { box-sizing: border-box; }
-  body {
+  html, body {
     margin: 0;
-    background: var(--paper);
+    background: var(--void);
     color: var(--ink);
     font-family: var(--sans);
     min-height: 100vh;
   }
-  header {
-    border-bottom: 1px solid var(--line);
-    padding: 28px 32px 20px;
+  #stars {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
   }
-  header .mark {
+  .shell {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    min-height: 100vh;
+  }
+
+  /* ---- Sidebar ---- */
+  nav.side {
+    width: 220px;
+    flex-shrink: 0;
+    background: rgba(18, 23, 41, 0.7);
+    backdrop-filter: blur(6px);
+    border-right: 1px solid var(--line);
+    padding: 28px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .brand {
     font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: #6b6558;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--teal);
+    margin-bottom: 4px;
   }
-  header h1 {
-    margin: 6px 0 0;
-    font-size: 28px;
+  .brand-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 28px;
+  }
+  .navitem {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 12px;
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .navitem:hover { background: rgba(124, 108, 240, 0.08); color: var(--ink); }
+  .navitem.active {
+    background: rgba(124, 108, 240, 0.14);
+    border-color: var(--violet-dim);
+    color: var(--ink);
+  }
+  .navitem .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .navitem.active .dot { background: var(--teal); box-shadow: 0 0 8px var(--teal); }
+
+  .status-block {
+    margin-top: auto;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .badge .pip {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--muted);
+  }
+  .badge.live .pip {
+    background: var(--clear);
+    box-shadow: 0 0 6px var(--clear);
+    animation: pulse 1.8s infinite;
+  }
+  .badge.down .pip { background: var(--alarm); box-shadow: 0 0 6px var(--alarm); }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.35; }
+  }
+
+  /* ---- Main ---- */
+  main {
+    flex: 1;
+    padding: 36px 44px;
+    max-width: 980px;
+  }
+  h1 {
+    font-size: 26px;
     font-weight: 700;
+    margin: 0 0 6px;
     letter-spacing: -0.01em;
   }
-  main {
-    max-width: 880px;
-    margin: 0 auto;
-    padding: 32px;
+  .subhead {
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 28px;
   }
-  .input-row {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-  }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Investigate view */
+  .input-row { display: flex; gap: 10px; align-items: flex-start; }
   textarea {
     flex: 1;
     min-height: 110px;
     padding: 14px;
     border: 1px solid var(--line);
-    background: #fff;
+    background: var(--panel);
+    color: var(--ink);
     font-family: var(--mono);
-    font-size: 13.5px;
+    font-size: 13px;
+    border-radius: 8px;
     resize: vertical;
-    border-radius: 2px;
   }
-  button {
-    background: var(--ink);
-    color: var(--paper);
+  textarea::placeholder { color: var(--muted); }
+  textarea:focus { outline: none; border-color: var(--violet); }
+  button.run {
+    background: var(--violet);
+    color: #fff;
     border: none;
-    padding: 14px 20px;
+    padding: 14px 22px;
     font-family: var(--sans);
     font-weight: 600;
     font-size: 13px;
     cursor: pointer;
-    letter-spacing: 0.02em;
-    border-radius: 2px;
+    border-radius: 8px;
+    white-space: nowrap;
+    transition: background 0.15s, box-shadow 0.15s;
   }
-  button:disabled { opacity: 0.5; cursor: wait; }
-  button:hover:not(:disabled) { background: #2a3038; }
+  button.run:hover:not(:disabled) { background: #8f80fa; box-shadow: 0 0 18px rgba(124,108,240,0.4); }
+  button.run:disabled { opacity: 0.5; cursor: wait; }
+  .hint { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 8px; }
 
-  .log {
-    margin-top: 28px;
-    border-left: 2px solid var(--line);
-    padding-left: 20px;
-  }
-  .step {
+  .radar {
+    margin-top: 32px;
+    width: 54px; height: 54px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
     position: relative;
-    padding: 4px 0 20px;
-    opacity: 0;
-    animation: fadeIn 0.35s ease forwards;
+    display: none;
   }
+  .radar.spin { display: block; }
+  .radar::before {
+    content: '';
+    position: absolute; inset: -2px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    border-top-color: var(--teal);
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .log { margin-top: 24px; border-left: 2px solid var(--line); padding-left: 20px; }
+  .step { position: relative; padding: 4px 0 18px; opacity: 0; animation: fadeIn 0.35s ease forwards; }
   @keyframes fadeIn { to { opacity: 1; } }
   .step::before {
-    content: '';
-    position: absolute;
-    left: -25px;
-    top: 8px;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--ink);
+    content: ''; position: absolute; left: -25px; top: 8px;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--violet);
   }
-  .step .label {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: #3c3830;
-  }
-  .step.running .label::after {
-    content: ' …';
-    color: #9a9483;
-  }
+  .step .label { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .step.running .label::after { content: ' …'; color: var(--muted); }
   .step pre {
-    margin: 8px 0 0;
-    background: #fff;
-    border: 1px solid var(--line);
-    padding: 10px 12px;
-    font-size: 12px;
-    overflow-x: auto;
-    border-radius: 2px;
-    max-height: 260px;
+    margin: 8px 0 0; background: var(--panel); border: 1px solid var(--line);
+    padding: 10px 12px; font-size: 11.5px; overflow-x: auto; border-radius: 6px; max-height: 240px;
+    color: var(--muted);
   }
 
-  .verdict {
-    margin-top: 24px;
-    border: 1px solid var(--line);
-    background: #fff;
-    padding: 22px;
-    border-radius: 3px;
+  .verdict { margin-top: 24px; border: 1px solid var(--line); background: var(--panel); padding: 24px; border-radius: 10px; }
+  .verdict-top { display: flex; gap: 24px; align-items: center; margin-bottom: 16px; }
+  .gauge { position: relative; width: 84px; height: 84px; flex-shrink: 0; }
+  .gauge svg { transform: rotate(-90deg); }
+  .gauge .track { fill: none; stroke: var(--line); stroke-width: 7; }
+  .gauge .fill { fill: none; stroke-width: 7; stroke-linecap: round; transition: stroke-dashoffset 0.8s ease; }
+  .gauge .num {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 18px; font-weight: 600;
   }
-  .verdict .badge {
-    display: inline-block;
-    font-family: var(--mono);
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    padding: 4px 10px;
-    border-radius: 2px;
-    color: #fff;
-    margin-bottom: 12px;
+  .badge-verdict {
+    display: inline-block; font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.06em; padding: 4px 10px; border-radius: 4px; color: #0a0e1a; font-weight: 700;
   }
-  .badge.malicious { background: var(--alarm); }
-  .badge.suspicious { background: var(--caution); }
-  .badge.likely_legitimate { background: var(--clear); }
-  .score {
-    font-family: var(--mono);
-    font-size: 13px;
-    color: #6b6558;
-    margin-bottom: 14px;
-  }
-  .verdict h3 { margin: 18px 0 6px; font-size: 14px; }
-  .verdict p, .verdict li { font-size: 14px; line-height: 1.55; }
+  .badge-verdict.malicious { background: var(--alarm); }
+  .badge-verdict.suspicious { background: var(--caution); }
+  .badge-verdict.likely_legitimate { background: var(--clear); }
+  .verdict p { font-size: 14px; line-height: 1.6; color: var(--ink); }
+  .indicators { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .indicators span { font-family: var(--mono); font-size: 11px; background: var(--panel-2); border: 1px solid var(--line); padding: 3px 8px; border-radius: 4px; color: var(--muted); }
+  .verdict h3 { font-size: 13px; margin: 18px 0 6px; color: var(--teal); font-family: var(--mono); }
   .verdict textarea.action {
-    width: 100%;
-    min-height: 90px;
-    font-family: var(--mono);
-    font-size: 12.5px;
-    padding: 10px;
-    border: 1px solid var(--line);
-    border-radius: 2px;
-    background: #fbfaf7;
+    width: 100%; min-height: 80px; font-family: var(--mono); font-size: 12px;
+    padding: 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel-2); color: var(--ink);
   }
-  .indicators { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
-  .indicators span {
-    font-family: var(--mono);
-    font-size: 11.5px;
-    background: #efece3;
-    border: 1px solid var(--line);
-    padding: 3px 8px;
-    border-radius: 2px;
+
+  /* Dashboard view */
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 20px;
   }
-  .wake-note {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: #9a9483;
-    margin-top: 8px;
+  .stat-card .num { font-family: var(--mono); font-size: 30px; font-weight: 700; color: var(--teal); }
+  .stat-card .lbl { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .stat-card.alarm .num { color: var(--alarm); }
+  .empty { color: var(--muted); font-size: 14px; padding: 40px 0; text-align: center; }
+
+  /* History view */
+  .history-item {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s;
   }
+  .history-item:hover { border-color: var(--violet-dim); }
+  .history-item .row1 { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .history-item .snippet { font-family: var(--mono); font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 480px; }
+  .history-item .meta { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 4px; }
 </style>
 </head>
 <body>
-<header>
-  <div class="mark">ScamShield / Investigation Console</div>
-  <h1>Paste a suspicious link, email, or message</h1>
-</header>
-<main>
-  <div class="input-row">
-    <textarea id="input" placeholder="Paste a URL, forwarded email, or scam SMS/WhatsApp text..."></textarea>
-    <button id="run">Investigate</button>
-  </div>
-  <div class="wake-note">First request may take 20-30s if the backend has been idle.</div>
+<canvas id="stars"></canvas>
 
-  <div id="log" class="log" style="display:none;"></div>
-  <div id="verdict"></div>
-</main>
+<div class="shell">
+  <nav class="side">
+    <div class="brand">SCAMSHIELD</div>
+    <div class="brand-sub">signal watch console</div>
+
+    <div class="navitem active" data-view="investigate"><span class="dot"></span>Investigate</div>
+    <div class="navitem" data-view="dashboard"><span class="dot"></span>Dashboard</div>
+    <div class="navitem" data-view="history"><span class="dot"></span>History</div>
+
+    <div class="status-block">
+      <div class="badge" id="badge-backend"><span class="pip"></span><span>Backend: checking…</span></div>
+      <div class="badge" id="badge-anakin"><span class="pip"></span><span>Scraper: idle</span></div>
+    </div>
+  </nav>
+
+  <main>
+    <!-- Investigate -->
+    <div class="view active" id="view-investigate">
+      <h1>Paste a suspicious link, email, or message</h1>
+      <div class="subhead">Live investigation — domain age, SSL, page fetch, and AI risk assessment.</div>
+
+      <div class="input-row">
+        <textarea id="input" placeholder="Paste a URL, forwarded email, or scam SMS/WhatsApp text..."></textarea>
+        <button class="run" id="run">Investigate</button>
+      </div>
+      <div class="hint">First request may take ~50s if the backend has been idle.</div>
+
+      <div class="radar" id="radar"></div>
+      <div class="log" id="log" style="display:none;"></div>
+      <div id="verdict"></div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="view" id="view-dashboard">
+      <h1>Dashboard</h1>
+      <div class="subhead">Signals processed on this device.</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="num" id="stat-total">0</div><div class="lbl">Investigations run</div></div>
+        <div class="stat-card alarm"><div class="num" id="stat-malicious">0</div><div class="lbl">Malicious / suspicious found</div></div>
+        <div class="stat-card"><div class="num" id="stat-domains">0</div><div class="lbl">Domains checked</div></div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="view" id="view-history">
+      <h1>History</h1>
+      <div class="subhead">Past investigations, stored on this device.</div>
+      <div id="history-list"></div>
+    </div>
+  </main>
+</div>
 
 <script>
   const API_BASE = window.SCAMSHIELD_API_BASE || "http://localhost:8000";
 
-  const runBtn = document.getElementById("run");
-  const input = document.getElementById("input");
-  const log = document.getElementById("log");
-  const verdictEl = document.getElementById("verdict");
+  /* ---------- starfield ---------- */
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    stars = Array.from({ length: 140 }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.2,
+      s: Math.random() * 0.3 + 0.05,
+      a: Math.random() * 0.6 + 0.2,
+    }));
+  }
+  function drawStars() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#0a0e1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    for (const st of stars) {
+      st.y += st.s;
+      if (st.y > canvas.height) st.y = 0;
+      ctx.beginPath();
+      ctx.arc(st.x, st.y, st.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(232,230,245,${st.a})`;
+      ctx.fill();
+    }
+    requestAnimationFrame(drawStars);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduceMotion) drawStars(); else { ctx.fillStyle = '#0a0e1a'; ctx.fillRect(0,0,canvas.width,canvas.height); }
+
+  /* ---------- nav ---------- */
+  document.querySelectorAll('.navitem').forEach(item => {
+    item.addEventListener('click', () => {
+      document.querySelectorAll('.navitem').forEach(i => i.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      item.classList.add('active');
+      document.getElementById('view-' + item.dataset.view).classList.add('active');
+      if (item.dataset.view === 'dashboard') renderDashboard();
+      if (item.dataset.view === 'history') renderHistory();
+    });
+  });
+
+  /* ---------- backend status ---------- */
+  async function checkBackend() {
+    const el = document.getElementById('badge-backend');
+    try {
+      const resp = await fetch(`${API_BASE}/health`);
+      const data = await resp.json();
+      if (data.status === 'ok') {
+        el.className = 'badge live';
+        el.querySelector('span:last-child').textContent = 'Backend: live';
+      } else {
+        throw new Error('bad status');
+      }
+    } catch {
+      el.className = 'badge down';
+      el.querySelector('span:last-child').textContent = 'Backend: unreachable';
+    }
+  }
+  checkBackend();
+
+  /* ---------- storage helpers ---------- */
+  async function loadHistory() {
+    try {
+      const res = await window.storage.get('history', false);
+      return res ? JSON.parse(res.value) : [];
+    } catch { return []; }
+  }
+  async function saveHistoryEntry(entry) {
+    const list = await loadHistory();
+    list.unshift(entry);
+    await window.storage.set('history', JSON.stringify(list.slice(0, 50)), false);
+  }
+
+  /* ---------- dashboard ---------- */
+  async function renderDashboard() {
+    const list = await loadHistory();
+    const total = list.length;
+    const malicious = list.filter(e => e.verdict === 'malicious' || e.verdict === 'suspicious').length;
+    const domains = new Set(list.flatMap(e => e.domains || [])).size;
+    document.getElementById('stat-total').textContent = total;
+    document.getElementById('stat-malicious').textContent = malicious;
+    document.getElementById('stat-domains').textContent = domains;
+  }
+
+  /* ---------- history ---------- */
+  function renderHistory() {
+    loadHistory().then(list => {
+      const el = document.getElementById('history-list');
+      if (!list.length) {
+        el.innerHTML = '<div class="empty">No investigations yet. Run one from the Investigate tab.</div>';
+        return;
+      }
+      el.innerHTML = list.map(e => `
+        <div class="history-item">
+          <div class="row1">
+            <span class="snippet">${(e.snippet || '').replace(/</g, '&lt;')}</span>
+            <span class="badge-verdict ${e.verdict || 'suspicious'}">${(e.verdict || 'unknown').replace('_', ' ')}</span>
+          </div>
+          <div class="meta">${e.time} · risk ${e.risk_score ?? '—'}/100</div>
+        </div>
+      `).join('');
+    });
+  }
+
+  /* ---------- investigate ---------- */
+  const runBtn = document.getElementById('run');
+  const input = document.getElementById('input');
+  const log = document.getElementById('log');
+  const verdictEl = document.getElementById('verdict');
+  const radar = document.getElementById('radar');
+  const anakinBadge = document.getElementById('badge-anakin');
 
   function renderStep(evt) {
-    let el = document.getElementById("step-" + evt.step);
+    let el = document.getElementById('step-' + evt.step);
     if (!el) {
-      el = document.createElement("div");
-      el.className = "step running";
-      el.id = "step-" + evt.step;
+      el = document.createElement('div');
+      el.className = 'step running';
+      el.id = 'step-' + evt.step;
       el.innerHTML = `<div class="label"></div>`;
       log.appendChild(el);
     }
-    el.className = "step " + (evt.status === "done" ? "done" : "running");
-    el.querySelector(".label").textContent = evt.label;
+    el.className = 'step ' + (evt.status === 'done' ? 'done' : 'running');
+    el.querySelector('.label').textContent = evt.label;
 
-    if (evt.status === "done" && evt.data && evt.step !== "complete") {
-      let pre = el.querySelector("pre");
-      if (!pre) {
-        pre = document.createElement("pre");
-        el.appendChild(pre);
-      }
+    if (evt.status === 'done' && evt.data && evt.step !== 'complete') {
+      let pre = el.querySelector('pre');
+      if (!pre) { pre = document.createElement('pre'); el.appendChild(pre); }
       pre.textContent = JSON.stringify(evt.data, null, 2);
+      if (JSON.stringify(evt.data).includes('anakin.io')) {
+        anakinBadge.className = 'badge live';
+        anakinBadge.querySelector('span:last-child').textContent = 'Scraper: anakin.io';
+      }
     }
+  }
+
+  function gaugeColor(score) {
+    if (score >= 66) return 'var(--alarm)';
+    if (score >= 33) return 'var(--caution)';
+    return 'var(--clear)';
   }
 
   function renderVerdict(final) {
     const v = final.verdict;
-    const badgeClass = v.verdict || "suspicious";
+    const badgeClass = v.verdict || 'suspicious';
+    const score = v.risk_score ?? 0;
+    const circ = 2 * Math.PI * 34;
+    const offset = circ - (score / 100) * circ;
+    const color = gaugeColor(score);
+
     verdictEl.innerHTML = `
       <div class="verdict">
-        <span class="badge ${badgeClass}">${(v.verdict || "unknown").replace("_", " ")}</span>
-        <div class="score">Risk score: ${v.risk_score ?? "—"} / 100</div>
-        <p>${v.justification || ""}</p>
-        <div class="indicators">
-          ${(v.indicators || []).map(i => `<span>${i}</span>`).join("")}
+        <div class="verdict-top">
+          <div class="gauge">
+            <svg width="84" height="84">
+              <circle class="track" cx="42" cy="42" r="34"></circle>
+              <circle class="fill" cx="42" cy="42" r="34"
+                stroke="${color}" stroke-dasharray="${circ}" stroke-dashoffset="${circ}"></circle>
+            </svg>
+            <div class="num">${score}</div>
+          </div>
+          <div>
+            <span class="badge-verdict ${badgeClass}">${(v.verdict || 'unknown').replace('_', ' ')}</span>
+            <div class="hint" style="margin-top:6px;">risk score / 100</div>
+          </div>
         </div>
-        ${v.abuse_report_draft ? `
-          <h3>Draft abuse report</h3>
-          <textarea class="action" readonly>${v.abuse_report_draft}</textarea>
-        ` : ""}
-        ${v.warning_reply_draft ? `
-          <h3>Draft warning reply</h3>
-          <textarea class="action" readonly>${v.warning_reply_draft}</textarea>
-        ` : ""}
-        ${v.incident_summary ? `
-          <h3>Shareable summary</h3>
-          <p>${v.incident_summary}</p>
-        ` : ""}
+        <p>${v.justification || ''}</p>
+        <div class="indicators">${(v.indicators || []).map(i => `<span>${i}</span>`).join('')}</div>
+        ${v.abuse_report_draft ? `<h3>Draft abuse report</h3><textarea class="action" readonly>${v.abuse_report_draft}</textarea>` : ''}
+        ${v.warning_reply_draft ? `<h3>Draft warning reply</h3><textarea class="action" readonly>${v.warning_reply_draft}</textarea>` : ''}
+        ${v.incident_summary ? `<h3>Shareable summary</h3><p>${v.incident_summary}</p>` : ''}
       </div>
     `;
+    requestAnimationFrame(() => {
+      const fillCircle = verdictEl.querySelector('.gauge .fill');
+      if (fillCircle) fillCircle.style.strokeDashoffset = offset;
+    });
+
+    saveHistoryEntry({
+      snippet: input.value.trim().slice(0, 80),
+      verdict: v.verdict,
+      risk_score: score,
+      domains: (final.parsed_input && final.parsed_input.domains) || [],
+      time: new Date().toLocaleString(),
+    });
   }
 
   async function runInvestigation() {
@@ -253,42 +510,44 @@
     if (!text) return;
 
     runBtn.disabled = true;
-    log.style.display = "block";
-    log.innerHTML = "";
-    verdictEl.innerHTML = "";
+    log.style.display = 'block';
+    log.innerHTML = '';
+    verdictEl.innerHTML = '';
+    radar.classList.add('spin');
+    anakinBadge.className = 'badge';
+    anakinBadge.querySelector('span:last-child').textContent = 'Scraper: working…';
 
     try {
       const resp = await fetch(`${API_BASE}/analyze`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       });
-
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = "";
-
+      let buffer = '';
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
+        const lines = buffer.split('\n');
         buffer = lines.pop();
         for (const line of lines) {
           if (!line.trim()) continue;
           const evt = JSON.parse(line);
           renderStep(evt);
-          if (evt.step === "complete") renderVerdict(evt.data);
+          if (evt.step === 'complete') renderVerdict(evt.data);
         }
       }
     } catch (err) {
       log.innerHTML += `<div class="step done"><div class="label">Error: ${err.message}</div></div>`;
     } finally {
       runBtn.disabled = false;
+      radar.classList.remove('spin');
     }
   }
 
-  runBtn.addEventListener("click", runInvestigation);
+  runBtn.addEventListener('click', runInvestigation);
 </script>
 </body>
 </html>
